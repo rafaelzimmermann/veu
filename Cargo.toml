@@ -1,0 +1,9 @@
+[package]
+name = "veu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+iced          = { version = "0.14", features = ["tokio"] }
+iced_layershell = "0.15"
+tokio         = { version = "1", features = ["rt-multi-thread", "macros", "process"] }
