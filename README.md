@@ -18,27 +18,54 @@ Built with [iced](https://github.com/iced-rs/iced) and [iced-layershell](https:/
 
 - Wayland compositor with `wlr-layer-shell` support (Hyprland, Sway, etc.)
 - PipeWire + WirePlumber (`wpctl` in PATH)
-- Rust toolchain
+- Rust toolchain (for building from source)
 
-## Build
+## Installation
+
+**System-wide** (installs to `/usr/local/bin`, requires sudo):
 
 ```sh
-cargo build --release
+bash scripts/install.sh
 ```
 
-Binary at `target/release/veu`.
+**Current user only** (installs to `~/.local/bin`, no sudo):
+
+```sh
+bash scripts/install.sh --user
+```
+
+**One-line install from GitHub:**
+
+```sh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/rafaelzimmermann/veu/main/scripts/install.sh)"
+```
+
+### Uninstall
+
+```sh
+bash scripts/install.sh --uninstall
+```
 
 ## Usage
 
+Bind veu to a key in your compositor config, e.g. Hyprland:
+
+```
+bind = $mod, V, exec, veu
+```
+
+### Theming
+
+The active theme is read from `~/.config/veu/theme.conf` on each launch.
+Switch to a bundled theme by writing its name to `~/.config/veu/current-theme`:
+
 ```sh
-./veu
+echo catppuccin-mocha > ~/.config/veu/current-theme
 ```
 
-Bind it to a key in your compositor config, e.g. Hyprland:
+Bundled themes: `default`, `catppuccin-mocha`, `dracula`, `gruvbox-dark`, `nord`, `tokyo-night`.
 
-```
-bind = $mod, V, exec, /path/to/veu
-```
+To customise, edit `~/.config/veu/theme.conf` (installed automatically, or copy from `assets/theme.conf`).
 
 ## Project layout
 
@@ -53,5 +80,5 @@ src/
 ├── audio/
 │   └── mod.rs               # PipeWire abstraction (load, set, mute via wpctl)
 └── theme/
-    └── mod.rs               # shared colour constants
+    └── mod.rs               # Theme struct, load from ~/.config/veu/theme.conf
 ```
