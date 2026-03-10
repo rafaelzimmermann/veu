@@ -54,6 +54,20 @@ Bind veu to a key in your compositor config, e.g. Hyprland:
 bind = $mod, V, exec, veu
 ```
 
+### Placement
+
+Control where the popup appears by editing `~/.config/veu/theme.conf`:
+
+```ini
+# Options: top-right | top-left | top-center
+#          bottom-right | bottom-left | bottom-center | center
+placement = top-right
+
+# Gap in pixels from the anchored screen edge (set to your waybar height
+# so the popup appears just below it rather than overlapping).
+margin = 40
+```
+
 ### Theming
 
 The active theme is read from `~/.config/veu/theme.conf` on each launch.
@@ -65,7 +79,7 @@ echo catppuccin-mocha > ~/.config/veu/current-theme
 
 Bundled themes: `default`, `catppuccin-mocha`, `dracula`, `gruvbox-dark`, `nord`, `tokyo-night`.
 
-To customise, edit `~/.config/veu/theme.conf` (installed automatically, or copy from `assets/theme.conf`).
+To customise colours, edit `~/.config/veu/theme.conf` (installed automatically, or copy from `assets/theme.conf`). Named themes only override colours — your `placement` and `margin` are preserved.
 
 ## Project layout
 

@@ -10,11 +10,13 @@ mod theme;
 
 fn main() -> iced_layershell::Result {
     let layer_settings = LayerShellSettings {
-        // No anchoring — the compositor centres the surface on the active screen.
-        anchor: Anchor::empty(),
+        // Full-screen transparent overlay — the popup is positioned inside view().
+        // This lets clicks in the transparent surrounding area be detected as
+        // Status::Ignored, which on_event() converts to Message::Close.
+        anchor: Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right,
         layer: Layer::Overlay,
-        exclusive_zone: 0,
-        size: Some((380, 180)),
+        exclusive_zone: -1,
+        size: None,
         margin: (0, 0, 0, 0),
         keyboard_interactivity: KeyboardInteractivity::Exclusive,
         start_mode: StartMode::Active,
@@ -29,8 +31,6 @@ fn main() -> iced_layershell::Result {
 
     iced_layershell::application(app::boot, app::namespace, app::update, app::view)
         .subscription(app::subscription)
-        // Fully transparent window — the rounded container in view() provides
-        // the visible background so the compositor can clip the corners cleanly.
         .style(|_state: &app::Veu, _theme: &iced::Theme| iced::theme::Style {
             background_color: iced::Color::TRANSPARENT,
             text_color: iced::Color::WHITE,

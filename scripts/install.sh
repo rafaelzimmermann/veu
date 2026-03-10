@@ -2,7 +2,7 @@
 # Install veu — Wayland PipeWire volume popup
 #
 # One-line install (recommended):
-#   sh -c "$(curl -fsSL https://raw.githubusercontent.com/spikelynch/veu/main/scripts/install.sh)"
+#   sh -c "$(curl -fsSL https://raw.githubusercontent.com/rafaelzimmermann/veu/main/scripts/install.sh)"
 #
 # Options:
 #   --user        install to ~/.local/bin instead of /usr/local/bin
@@ -105,7 +105,7 @@ if [[ ! -f Cargo.toml ]]; then
     CLONE_DIR=$(mktemp -d)
     trap 'rm -rf "$CLONE_DIR"' EXIT
     echo "Cloning veu…"
-    git clone --depth=1 https://github.com/spikelynch/veu.git "$CLONE_DIR"
+    git clone --depth=1 https://github.com/rafaelzimmermann/veu.git "$CLONE_DIR"
     cd "$CLONE_DIR"
 fi
 
@@ -181,7 +181,7 @@ EOF
 echo ""
 echo "Installed:  $BINARY"
 echo "Desktop:    $DESKTOP_FILE"
-echo "Config:     $THEME_FILE"
+echo "Theme:      $THEME_FILE"
 echo "Themes:     $THEMES_DIR"
 echo ""
 
@@ -194,6 +194,10 @@ fi
 
 echo "Bind it to a key in your Hyprland config:"
 echo "  bind = \$mod, V, exec, veu"
+echo ""
+echo "Placement (edit $THEME_FILE):"
+echo "  placement = top-right   # or top-left, bottom-right, center, …"
+echo "  margin = 36             # set to your waybar height"
 echo ""
 echo "Switch themes by writing a theme name to ~/.config/veu/current-theme:"
 echo "  echo catppuccin-mocha > ~/.config/veu/current-theme"
