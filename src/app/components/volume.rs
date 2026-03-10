@@ -58,7 +58,10 @@ impl VolumeControl {
 
             Msg::SinkReleased(v) => {
                 self.sink_volume = v;
-                tokio::spawn(audio::set_sink_volume(v));
+                tokio::spawn(async move {
+                    audio::set_sink_volume(v).await;
+                    audio::play_volume_feedback().await;
+                });
             }
 
             Msg::SourceReleased(v) => {

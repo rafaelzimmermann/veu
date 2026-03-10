@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Volume feedback sound** — a short system sound plays after releasing the output slider so the user can judge whether the new level is adequate. Uses `paplay` with the freedesktop sound theme (`audio-volume-change.oga`); silently no-ops if `paplay` or the sound file is not available. The sound is applied after `wpctl set-volume` completes so it plays at the new level.
+
 ## [0.1.0] - 2026-03-10
 
 ### Added

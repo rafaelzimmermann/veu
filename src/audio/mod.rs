@@ -27,6 +27,22 @@ pub async fn toggle_mute_all() {
     wpctl(&["set-mute", "@DEFAULT_AUDIO_SOURCE@", "toggle"]).await;
 }
 
+/// Play a short system sound so the user can judge the new volume level.
+/// Tries freedesktop sound theme candidates in order; silently no-ops if
+/// neither `paplay` nor a suitable sound file is available.
+pub async fn play_volume_feedback() {
+    const SOUNDS: &[&str] = &[
+        "/usr/share/sounds/freedesktop/stereo/audio-volume-change.oga",
+        "/usr/share/sounds/freedesktop/stereo/audio-volume-change.flac",
+    ];
+    for path in SOUNDS {
+        if std::path::Path::new(path).exists() {
+            let _ = tokio::process::Command::new("paplay").arg(path).status().await;
+            return;
+        }
+    }
+}
+
 // ── Internals ────────────────────────────────────────────────────────────────
 
 async fn get_volume(target: &str) -> (f32, bool) {
