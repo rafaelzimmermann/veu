@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Settings panel** — gear button (⚙) in the tray header opens a 700 × 520 centred overlay with full audio controls. Closes via ✕ button or click outside.
+- **System device selection** — Output and Input pick-lists in the System section set the PipeWire default sink/source via `pactl set-default-sink/source`. Selection is persisted in `~/.config/veu/device-prefs.conf` and re-applied on next launch.
+- **Per-application volume and routing** — Applications — Output and Applications — Input sections list all active PipeWire sink-inputs and source-outputs with individual sliders (0–150%) and device pick-lists. Device assignments are stored per app name and restored automatically when settings open.
+- **System / Custom routing mode** — each applications section has a segmented pill toggle. *System* mode immediately routes all streams to the current default device and re-applies this at every app startup; *Custom* mode re-enables per-app stored preferences. Mode preference is persisted in `device-prefs.conf`.
+- **Startup routing** — `apply_routing_preferences()` runs at boot (before the tray appears) to enforce whichever routing mode was last saved, with no settings panel interaction required.
+- **Mute state in settings** — muted per-app streams are visually dimmed and display 🔇 instead of 🔊 / 🎙.
+- **Volume percentage readout** — all sliders (tray and settings) display the current value as a `%` label to the right of the handle.
+
+### Changed
+- **Tray popup** — gear button moved into the header row alongside Mute All (footer row removed); height reduced from 200 → 180 px; "Mute All" label becomes "Unmute" when active.
+- **Settings layout** — section headers (`SYSTEM`, `APPLICATIONS — OUTPUT/INPUT`) rendered in subdued uppercase at 11 px; all rows share aligned fixed-width columns (label · icon · slider · % · dropdown); padding increased to 20 px; spacing tightened throughout.
+- **`device-prefs.conf`** — file extended with reserved keys: `__default_sink__`, `__default_source__`, `__sink_input_mode__`, `__source_output_mode__`.
+
+### Removed
+- Unused `Placement::anchor()`, `Placement::margin()`, and `Theme::from_file()` methods and their associated tests.
+
+### Added
 - **Volume feedback sound** — a short system sound plays after releasing the output slider so the user can judge whether the new level is adequate. Uses `paplay` with the freedesktop sound theme (`audio-volume-change.oga`); silently no-ops if `paplay` or the sound file is not available. The sound is applied after `wpctl set-volume` completes so it plays at the new level.
 - **Configurable placement** — `placement` and `margin` are now first-class theme fields. The popup can be anchored to any corner or edge (`top-right`, `top-left`, `top-center`, `bottom-right`, `bottom-left`, `bottom-center`, `center`). Both keys live in `theme.conf` alongside colours; named colour-only themes inherit the user's placement/margin unchanged.
 - **Click-outside-to-close** — the layer-shell surface now covers the full monitor (transparent background). Clicks inside the popup box are absorbed; clicks anywhere outside it close the popup. This matches the compositor interaction model used by trebuchet.

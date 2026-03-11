@@ -1,5 +1,4 @@
 use iced::Color;
-use iced_layershell::reexport::Anchor;
 
 // ── Placement ─────────────────────────────────────────────────────────────────
 
@@ -16,34 +15,6 @@ pub enum Placement {
     Center,
 }
 
-impl Placement {
-    pub fn anchor(&self) -> Anchor {
-        match self {
-            Placement::TopRight     => Anchor::Top    | Anchor::Right,
-            Placement::TopLeft      => Anchor::Top    | Anchor::Left,
-            Placement::TopCenter    => Anchor::Top,
-            Placement::BottomRight  => Anchor::Bottom | Anchor::Right,
-            Placement::BottomLeft   => Anchor::Bottom | Anchor::Left,
-            Placement::BottomCenter => Anchor::Bottom,
-            Placement::Center       => Anchor::empty(),
-        }
-    }
-
-    /// Returns `(top, right, bottom, left)` margins with `gap` applied to the
-    /// anchored edges so the popup sits `gap` pixels from the screen edge /
-    /// waybar.
-    pub fn margin(&self, gap: i32) -> (i32, i32, i32, i32) {
-        match self {
-            Placement::TopRight     => (gap, gap,   0,   0),
-            Placement::TopLeft      => (gap,   0,   0, gap),
-            Placement::TopCenter    => (gap,   0,   0,   0),
-            Placement::BottomRight  => (  0, gap, gap,   0),
-            Placement::BottomLeft   => (  0,   0, gap, gap),
-            Placement::BottomCenter => (  0,   0, gap,   0),
-            Placement::Center       => (  0,   0,   0,   0),
-        }
-    }
-}
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 
@@ -119,12 +90,6 @@ impl Theme {
         }
 
         theme
-    }
-
-    /// Load a theme from an arbitrary `.conf` file. Returns `None` if unreadable.
-    pub fn from_file(path: &std::path::Path) -> Option<Self> {
-        let content = std::fs::read_to_string(path).ok()?;
-        Some(Self::parse_onto(Self::default(), &content))
     }
 
     fn parse_onto(mut base: Self, content: &str) -> Self {
@@ -285,16 +250,4 @@ mod tests {
         assert_eq!(result.margin, 40);
     }
 
-    #[test]
-    fn top_right_anchor_and_margin() {
-        let p = Placement::TopRight;
-        assert_eq!(p.anchor(), Anchor::Top | Anchor::Right);
-        assert_eq!(p.margin(10), (10, 10, 0, 0));
-    }
-
-    #[test]
-    fn center_has_empty_anchor_and_zero_margin() {
-        assert_eq!(Placement::Center.anchor(), Anchor::empty());
-        assert_eq!(Placement::Center.margin(10), (0, 0, 0, 0));
-    }
 }
