@@ -13,12 +13,15 @@ All notable changes to this project will be documented in this file.
 - **Per-channel mute** — Output and Input each have an individual mute button (the speaker/mic icon). Clicking it toggles that channel via `pactl`/`wpctl`; the icon switches to 🔇 and the entire row dims. Applies in both the tray popup and the settings panel for system and per-app streams.
 - **Theme selection in settings** — a THEME pick-list at the bottom of the settings panel lists all installed named themes. Selecting one applies it immediately and persists the choice to `~/.config/veu/current-theme`.
 - **Volume percentage readout** — all sliders (tray and settings) display the current value as a `%` label to the right of the handle.
+- **Application icons in settings** — each per-app stream row shows the application's icon (resolved from `application.icon_name` via the hicolor icon theme and pixmaps directories). A styled ♫ placeholder is shown when no icon is found. The app name appears as a tooltip on hover.
+- **System-mode device dropdowns always visible** — per-app device pick-lists are rendered in every row regardless of routing mode; in System mode they are visually dimmed and non-interactive (`Msg::Noop`) to signal the setting is controlled centrally.
 
 ### Changed
 - **Tray popup** — gear button moved into the header row alongside Mute All (footer row removed); height reduced from 200 → 180 px; "Mute All" label becomes "Unmute" when active.
 - **Settings layout** — section headers (`SYSTEM`, `APPLICATIONS — OUTPUT/INPUT`) rendered in subdued uppercase at 11 px; all rows share aligned fixed-width columns (label · icon · slider · % · dropdown); padding increased to 20 px; spacing tightened throughout.
 - **`device-prefs.conf`** — file extended with reserved keys: `__default_sink__`, `__default_source__`, `__sink_input_mode__`, `__source_output_mode__`.
 - **`volume.rs` refactor** — view logic split into a `ViewColors` struct (centralises derived colours and button/slider style factories) and a `channel_row()` free function (renders one labelled slider row); eliminates duplication between the Output and Input rows.
+- **Settings app-icon layout fixes** — icon placeholder now uses `center(Length::Fixed(24.0))` so it is exactly 24×24 and does not expand to fill row height; scrollable content reserves a fixed right padding matching the scrollbar width so the row layout is stable whether or not the scrollbar is visible.
 
 ### Removed
 - Unused `Placement::anchor()`, `Placement::margin()`, and `Theme::from_file()` methods and their associated tests.

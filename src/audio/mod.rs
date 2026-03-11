@@ -30,6 +30,8 @@ impl std::fmt::Display for AudioDevice {
 pub struct AppStream {
     pub id: u32,
     pub app_name: String,
+    /// Resolved path to the application's icon, if found on disk.
+    pub icon_path: Option<std::path::PathBuf>,
     pub volume: f32,
     pub muted: bool,
     /// Current sink or source id.
@@ -352,6 +354,65 @@ pub fn save_device_pref(app: &str, device_description: &str) {
     let _ = std::fs::write(&path, content);
 }
 
+// ── Icon lookup ───────────────────────────────────────────────────────────────
+
+/// Try to find a PNG icon for `name` on disk.
+///
+/// Search order:
+/// 1. Absolute path — returned as-is if it exists and is a PNG/JPG.
+/// 2. `~/.local/share/icons/hicolor/<size>/apps/<name>.png`
+/// 3. `/usr/share/icons/hicolor/<size>/apps/<name>.png`
+/// 4. `/usr/share/pixmaps/<name>.png`
+///
+/// Returns the first path that exists, or `None`.
+pub fn find_app_icon(name: &str) -> Option<std::path::PathBuf> {
+    if name.is_empty() {
+        return None;
+    }
+
+    // Absolute path (some apps set application.icon_name to a full path).
+    if name.starts_with('/') {
+        let p = std::path::PathBuf::from(name);
+        if p.exists() {
+            return Some(p);
+        }
+        return None;
+    }
+
+    let home = std::env::var("HOME").unwrap_or_default();
+    let sizes = ["48x48", "32x32", "64x64", "24x24", "256x256"];
+    let exts = ["png", "jpg", "jpeg"];
+
+    let icon_roots: &[std::path::PathBuf] = &[
+        std::path::PathBuf::from(&home).join(".local/share/icons/hicolor"),
+        std::path::PathBuf::from("/usr/share/icons/hicolor"),
+        std::path::PathBuf::from("/usr/local/share/icons/hicolor"),
+    ];
+
+    for root in icon_roots {
+        for size in sizes {
+            for ext in exts {
+                let path = root.join(size).join("apps").join(format!("{}.{}", name, ext));
+                if path.exists() {
+                    return Some(path);
+                }
+            }
+        }
+    }
+
+    // Pixmaps fallback.
+    for dir in &["/usr/share/pixmaps", "/usr/local/share/pixmaps"] {
+        for ext in exts {
+            let path = std::path::PathBuf::from(dir).join(format!("{}.{}", name, ext));
+            if path.exists() {
+                return Some(path);
+            }
+        }
+    }
+
+    None
+}
+
 // ── Internals ────────────────────────────────────────────────────────────────
 
 async fn get_volume(target: &str) -> (f32, bool) {
@@ -511,7 +572,10 @@ fn parse_sink_inputs(output: &str) -> Vec<AppStream> {
         let muted = extract_field(&block, "Mute:") == "yes";
         let volume = extract_percent(&block);
         let app_name = extract_property(&block, "application.name");
-        inputs.push(AppStream { id, app_name, volume, muted, device_id });
+        let icon_name = extract_property(&block, "application.icon_name");
+        let icon_path = find_app_icon(&icon_name)
+            .or_else(|| find_app_icon(&app_name.to_lowercase()));
+        inputs.push(AppStream { id, app_name, icon_path, volume, muted, device_id });
     }
     inputs
 }
@@ -524,7 +588,10 @@ fn parse_source_outputs(output: &str) -> Vec<AppStream> {
         let muted = extract_field(&block, "Mute:") == "yes";
         let volume = extract_percent(&block);
         let app_name = extract_property(&block, "application.name");
-        outputs.push(AppStream { id, app_name, volume, muted, device_id });
+        let icon_name = extract_property(&block, "application.icon_name");
+        let icon_path = find_app_icon(&icon_name)
+            .or_else(|| find_app_icon(&app_name.to_lowercase()));
+        outputs.push(AppStream { id, app_name, icon_path, volume, muted, device_id });
     }
     outputs
 }

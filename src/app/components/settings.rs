@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use iced::{
     border::Radius,
-    widget::{button, column, container, pick_list, row, rule, scrollable, space, text},
+    widget::{button, column, container, pick_list, row, rule, scrollable, space, text, tooltip},
     Alignment, Background, Border, Color, Element, Length, Task,
 };
 
@@ -48,6 +48,8 @@ pub enum Msg {
     SystemSourceMuteToggled,
     SinkInputMuteToggled(u32),
     SourceOutputMuteToggled(u32),
+    // No-op: absorbs pick_list callbacks when the dropdown is disabled
+    Noop,
     // Theme selection
     ThemeChanged(String),
 }
@@ -265,6 +267,8 @@ impl SettingsPanel {
                 tokio::spawn(audio::toggle_source_output_mute(id));
             }
 
+            Msg::Noop => {}
+
             // Intercepted by app/mod.rs; state.theme and theme_name are updated there.
             Msg::ThemeChanged(_) => {}
         }
@@ -327,6 +331,61 @@ impl SettingsPanel {
         // Ghost button style for mute icons.
         let mute_icon_style =
             move |_: &iced::Theme, _: button::Status| button::Style { ..Default::default() };
+
+        // Pick-list style factory — dimmed when disabled (System mode).
+        let make_pick_style = move |disabled: bool| {
+            move |_: &iced::Theme,
+                  _: iced::widget::pick_list::Status|
+                  -> iced::widget::pick_list::Style {
+                let fg = if disabled { muted_dim } else { text_color };
+                iced::widget::pick_list::Style {
+                    text_color: fg,
+                    placeholder_color: muted_dim,
+                    handle_color: fg,
+                    background: Background::Color(btn_inactive),
+                    border: Border { radius: 4.0.into(), ..Default::default() },
+                }
+            }
+        };
+
+        // App icon element with the app name as a tooltip.
+        // Shows the resolved icon image, or a styled placeholder when none is found.
+        let app_icon_widget = move |icon_path: &Option<std::path::PathBuf>,
+                                    app_name: &str|
+              -> Element<'_, Msg> {
+            // Both branches produce a fixed 24×24 element so column alignment is stable.
+            let icon: Element<'_, Msg> = match icon_path {
+                Some(path) => container(
+                    iced::widget::image(iced::widget::image::Handle::from_path(path))
+                        .width(24)
+                        .height(24),
+                )
+                .center(Length::Fixed(24.0))
+                .into(),
+
+                None => container(text("♫").size(11).color(muted_dim))
+                    .center(Length::Fixed(24.0))
+                    .style(move |_| container::Style {
+                        background: Some(Background::Color(btn_inactive)),
+                        border: Border { radius: 6.0.into(), ..Default::default() },
+                        ..Default::default()
+                    })
+                    .into(),
+            };
+
+            tooltip(
+                icon,
+                container(text(app_name.to_string()).size(12).color(text_color))
+                    .padding([4, 8])
+                    .style(move |_| container::Style {
+                        background: Some(Background::Color(btn_inactive)),
+                        border: Border { radius: 4.0.into(), ..Default::default() },
+                        ..Default::default()
+                    }),
+                tooltip::Position::Top,
+            )
+            .into()
+        };
 
         // Segmented pill: [System][Custom] with half-rounded corners on each side.
         let pill_toggle = |is_system: bool,
@@ -476,66 +535,41 @@ impl SettingsPanel {
                         let muted = input.muted;
                         let label_color = if muted { muted_dim } else { text_color };
                         let icon = if muted { "🔇" } else { "🔊" };
-                        let label = if input.app_name.is_empty() {
+                        let display_name = if input.app_name.is_empty() {
                             format!("Stream {}", input.id)
                         } else {
                             input.app_name.clone()
                         };
 
-                        let app_sl = make_slider_style(muted);
-                        let app_row: Element<'_, Msg> = if si_system {
-                            row![
-                                text(label).size(13).color(label_color).width(90),
-                                button(text(icon).size(14).color(label_color))
-                                    .on_press(Msg::SinkInputMuteToggled(id))
-                                    .padding(0)
-                                    .style(mute_icon_style),
-                                iced::widget::slider(0.0..=1.5, vol, move |v| {
-                                    Msg::SinkInputVolumeChanged(id, v)
-                                })
-                                .on_release(Msg::SinkInputVolumeReleased(id, vol))
-                                .step(0.01)
-                                .style(app_sl)
-                                .width(Length::Fill),
-                                text(format!("{:.0}%", vol * 100.0))
-                                    .size(12)
-                                    .color(if muted { muted_dim } else { subdued })
-                                    .width(44),
-                            ]
-                            .spacing(10)
-                            .align_y(Alignment::Center)
-                            .into()
-                        } else {
-                            let selected =
-                                data.sinks.iter().find(|s| s.id == input.device_id).cloned();
-                            row![
-                                text(label).size(13).color(label_color).width(90),
-                                button(text(icon).size(14).color(label_color))
-                                    .on_press(Msg::SinkInputMuteToggled(id))
-                                    .padding(0)
-                                    .style(mute_icon_style),
-                                iced::widget::slider(0.0..=1.5, vol, move |v| {
-                                    Msg::SinkInputVolumeChanged(id, v)
-                                })
-                                .on_release(Msg::SinkInputVolumeReleased(id, vol))
-                                .step(0.01)
-                                .style(app_sl)
-                                .width(Length::Fill),
-                                text(format!("{:.0}%", vol * 100.0))
-                                    .size(12)
-                                    .color(if muted { muted_dim } else { subdued })
-                                    .width(44),
-                                pick_list(
-                                    data.sinks.clone(),
-                                    selected,
-                                    move |d| Msg::SinkInputDeviceSelected(id, d),
-                                )
-                                .width(185),
-                            ]
-                            .spacing(10)
-                            .align_y(Alignment::Center)
-                            .into()
-                        };
+                        let selected =
+                            data.sinks.iter().find(|s| s.id == input.device_id).cloned();
+                        let app_row = row![
+                            app_icon_widget(&input.icon_path, &display_name),
+                            button(text(icon).size(14).color(label_color))
+                                .on_press(Msg::SinkInputMuteToggled(id))
+                                .padding(0)
+                                .style(mute_icon_style),
+                            iced::widget::slider(0.0..=1.5, vol, move |v| {
+                                Msg::SinkInputVolumeChanged(id, v)
+                            })
+                            .on_release(Msg::SinkInputVolumeReleased(id, vol))
+                            .step(0.01)
+                            .style(make_slider_style(muted))
+                            .width(Length::Fill),
+                            text(format!("{:.0}%", vol * 100.0))
+                                .size(12)
+                                .color(if muted { muted_dim } else { subdued })
+                                .width(44),
+                            pick_list(
+                                data.sinks.clone(),
+                                selected,
+                                move |d| if si_system { Msg::Noop } else { Msg::SinkInputDeviceSelected(id, d) },
+                            )
+                            .width(185)
+                            .style(make_pick_style(si_system)),
+                        ]
+                        .spacing(10)
+                        .align_y(Alignment::Center);
                         apps_col = apps_col.push(app_row);
                     }
                 }
@@ -559,72 +593,59 @@ impl SettingsPanel {
                         let muted = output.muted;
                         let label_color = if muted { muted_dim } else { text_color };
                         let icon = if muted { "🔇" } else { "🎙" };
-                        let label = if output.app_name.is_empty() {
+                        let display_name = if output.app_name.is_empty() {
                             format!("Stream {}", output.id)
                         } else {
                             output.app_name.clone()
                         };
 
-                        let app_sl = make_slider_style(muted);
-                        let app_row: Element<'_, Msg> = if so_system {
-                            row![
-                                text(label).size(13).color(label_color).width(90),
-                                button(text(icon).size(14).color(label_color))
-                                    .on_press(Msg::SourceOutputMuteToggled(id))
-                                    .padding(0)
-                                    .style(mute_icon_style),
-                                iced::widget::slider(0.0..=1.5, vol, move |v| {
-                                    Msg::SourceOutputVolumeChanged(id, v)
-                                })
-                                .on_release(Msg::SourceOutputVolumeReleased(id, vol))
-                                .step(0.01)
-                                .style(app_sl)
-                                .width(Length::Fill),
-                                text(format!("{:.0}%", vol * 100.0))
-                                    .size(12)
-                                    .color(if muted { muted_dim } else { subdued })
-                                    .width(44),
-                            ]
-                            .spacing(10)
-                            .align_y(Alignment::Center)
-                            .into()
-                        } else {
-                            let selected =
-                                data.sources.iter().find(|s| s.id == output.device_id).cloned();
-                            row![
-                                text(label).size(13).color(label_color).width(90),
-                                button(text(icon).size(14).color(label_color))
-                                    .on_press(Msg::SourceOutputMuteToggled(id))
-                                    .padding(0)
-                                    .style(mute_icon_style),
-                                iced::widget::slider(0.0..=1.5, vol, move |v| {
-                                    Msg::SourceOutputVolumeChanged(id, v)
-                                })
-                                .on_release(Msg::SourceOutputVolumeReleased(id, vol))
-                                .step(0.01)
-                                .style(app_sl)
-                                .width(Length::Fill),
-                                text(format!("{:.0}%", vol * 100.0))
-                                    .size(12)
-                                    .color(if muted { muted_dim } else { subdued })
-                                    .width(44),
-                                pick_list(
-                                    data.sources.clone(),
-                                    selected,
-                                    move |d| Msg::SourceOutputDeviceSelected(id, d),
-                                )
-                                .width(185),
-                            ]
-                            .spacing(10)
-                            .align_y(Alignment::Center)
-                            .into()
-                        };
+                        let selected =
+                            data.sources.iter().find(|s| s.id == output.device_id).cloned();
+                        let app_row = row![
+                            app_icon_widget(&output.icon_path, &display_name),
+                            button(text(icon).size(14).color(label_color))
+                                .on_press(Msg::SourceOutputMuteToggled(id))
+                                .padding(0)
+                                .style(mute_icon_style),
+                            iced::widget::slider(0.0..=1.5, vol, move |v| {
+                                Msg::SourceOutputVolumeChanged(id, v)
+                            })
+                            .on_release(Msg::SourceOutputVolumeReleased(id, vol))
+                            .step(0.01)
+                            .style(make_slider_style(muted))
+                            .width(Length::Fill),
+                            text(format!("{:.0}%", vol * 100.0))
+                                .size(12)
+                                .color(if muted { muted_dim } else { subdued })
+                                .width(44),
+                            pick_list(
+                                data.sources.clone(),
+                                selected,
+                                move |d| if so_system { Msg::Noop } else { Msg::SourceOutputDeviceSelected(id, d) },
+                            )
+                            .width(185)
+                            .style(make_pick_style(so_system)),
+                        ]
+                        .spacing(10)
+                        .align_y(Alignment::Center);
                         apps_col = apps_col.push(app_row);
                     }
                 }
 
-                let apps_scroll =
-                    scrollable(container(apps_col).width(Length::Fill)).height(Length::Fill);
+                // Reserve the scrollbar width as right padding so the row layout
+                // is identical whether or not the scrollbar is visible.
+                const SCROLLBAR_WIDTH: f32 = 8.0;
+                let apps_scroll = scrollable(
+                    container(apps_col)
+                        .width(Length::Fill)
+                        .padding(iced::Padding { right: SCROLLBAR_WIDTH, ..Default::default() }),
+                )
+                .direction(iced::widget::scrollable::Direction::Vertical(
+                    iced::widget::scrollable::Scrollbar::new()
+                        .width(SCROLLBAR_WIDTH)
+                        .scroller_width(4),
+                ))
+                .height(Length::Fill);
 
                 column![system_section, rule::horizontal(1), apps_scroll]
                     .spacing(14)
