@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.2.0] - 2026-03-11
 
 ### Added
 - **Settings panel** — gear button (⚙) in the tray header opens a 700 × 520 centred overlay with full audio controls. Closes via ✕ button or click outside.
@@ -14,26 +14,22 @@ All notable changes to this project will be documented in this file.
 - **Theme selection in settings** — a THEME pick-list at the bottom of the settings panel lists all installed named themes. Selecting one applies it immediately and persists the choice to `~/.config/veu/current-theme`.
 - **Volume percentage readout** — all sliders (tray and settings) display the current value as a `%` label to the right of the handle.
 - **Application icons in settings** — each per-app stream row shows the application's icon (resolved from `application.icon_name` via the hicolor icon theme and pixmaps directories). A styled ♫ placeholder is shown when no icon is found. The app name appears as a tooltip on hover.
-- **System-mode device dropdowns always visible** — per-app device pick-lists are rendered in every row regardless of routing mode; in System mode they are visually dimmed and non-interactive (`Msg::Noop`) to signal the setting is controlled centrally.
+- **System-mode device dropdowns always visible** — per-app device pick-lists are rendered in every row regardless of routing mode; in System mode they are visually dimmed and non-interactive to signal the setting is controlled centrally.
+- **Volume feedback sound** — a short system sound plays after releasing the output slider so the user can judge whether the new level is adequate. Uses `paplay` with the freedesktop sound theme (`audio-volume-change.oga`); silently no-ops if `paplay` or the sound file is not available.
+- **Configurable placement** — `placement` and `margin` are now first-class theme fields. The popup can be anchored to any corner or edge (`top-right`, `top-left`, `top-center`, `bottom-right`, `bottom-left`, `bottom-center`, `center`). Both keys live in `theme.conf` alongside colours; named colour-only themes inherit the user's placement/margin unchanged.
+- **Click-outside-to-close** — the layer-shell surface covers the full monitor (transparent background). Clicks inside the popup box are absorbed; clicks anywhere outside close the popup.
+- **App icon** (`assets/icon.png`) — transparent-background PNG installed to the hicolor icon theme so launchers display it.
+- **Launcher visibility** — desktop entry now installs to `/usr/share/applications` (system) or `~/.local/share/applications` (user) with `Icon=veu` and `Categories=AudioVideo;Audio;Utility;`.
 
 ### Changed
-- **Tray popup** — gear button moved into the header row alongside Mute All (footer row removed); height reduced from 200 → 180 px; "Mute All" label becomes "Unmute" when active.
-- **Settings layout** — section headers (`SYSTEM`, `APPLICATIONS — OUTPUT/INPUT`) rendered in subdued uppercase at 11 px; all rows share aligned fixed-width columns (label · icon · slider · % · dropdown); padding increased to 20 px; spacing tightened throughout.
+- **Tray popup** — gear button moved into the header row alongside Mute All; height reduced to 128 px; "Mute All" label becomes "Unmute" when active.
+- **Settings layout** — section headers (`SYSTEM`, `APPLICATIONS — OUTPUT/INPUT`) rendered in subdued uppercase at 11 px; all rows share aligned fixed-width columns (label · icon · slider · % · dropdown); padding increased to 20 px.
 - **`device-prefs.conf`** — file extended with reserved keys: `__default_sink__`, `__default_source__`, `__sink_input_mode__`, `__source_output_mode__`.
-- **`volume.rs` refactor** — view logic split into a `ViewColors` struct (centralises derived colours and button/slider style factories) and a `channel_row()` free function (renders one labelled slider row); eliminates duplication between the Output and Input rows.
-- **Settings app-icon layout fixes** — icon placeholder now uses `center(Length::Fixed(24.0))` so it is exactly 24×24 and does not expand to fill row height; scrollable content reserves a fixed right padding matching the scrollbar width so the row layout is stable whether or not the scrollbar is visible.
+- **`volume.rs` refactor** — view logic split into a `ViewColors` struct (centralises derived colours and button/slider style factories) and a `channel_row()` free function; eliminates duplication between the Output and Input rows.
+- **Settings app-icon layout** — icon placeholder uses `center(Length::Fixed(24.0))` so it is exactly 24×24; scrollable content reserves fixed right padding matching the scrollbar width so layout is stable whether or not the scrollbar is visible.
 
 ### Removed
 - Unused `Placement::anchor()`, `Placement::margin()`, and `Theme::from_file()` methods and their associated tests.
-
-### Added
-- **Volume feedback sound** — a short system sound plays after releasing the output slider so the user can judge whether the new level is adequate. Uses `paplay` with the freedesktop sound theme (`audio-volume-change.oga`); silently no-ops if `paplay` or the sound file is not available. The sound is applied after `wpctl set-volume` completes so it plays at the new level.
-- **Configurable placement** — `placement` and `margin` are now first-class theme fields. The popup can be anchored to any corner or edge (`top-right`, `top-left`, `top-center`, `bottom-right`, `bottom-left`, `bottom-center`, `center`). Both keys live in `theme.conf` alongside colours; named colour-only themes inherit the user's placement/margin unchanged.
-- **Click-outside-to-close** — the layer-shell surface now covers the full monitor (transparent background). Clicks inside the popup box are absorbed; clicks anywhere outside it close the popup. This matches the compositor interaction model used by trebuchet.
-- **App icon** (`assets/icon.png`) — transparent-background PNG installed to the hicolor icon theme so launchers display it.
-- **Launcher visibility** — desktop entry now installs to `/usr/share/applications` (system) or `~/.local/share/applications` (user) with `Icon=veu` and `Categories=AudioVideo;Audio;Utility;`, making veu visible in app launchers. Old misplaced files from prior installs are cleaned up automatically.
-
-### Removed
 - `veu.conf` (separate placement config) — placement and margin have moved into `theme.conf`; the `config` module has been eliminated.
 
 ## [0.1.0] - 2026-03-10

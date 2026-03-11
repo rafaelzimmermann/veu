@@ -199,7 +199,7 @@ pub fn view(state: &Veu) -> Element<'_, Message> {
             let popup = mouse_area(
                 container(content)
                     .width(380)
-                    .height(180)
+                    .height(128)
                     .style(move |_| container::Style {
                         background: Some(Background::Color(bg)),
                         border: Border { radius: 14.0.into(), ..Default::default() },
