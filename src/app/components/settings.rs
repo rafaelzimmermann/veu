@@ -7,7 +7,7 @@ use iced::{
 };
 
 use crate::audio::{self, AudioDevice, SettingsData, StreamMode};
-use crate::theme::Theme;
+use crate::theme::{self, Theme};
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -15,8 +15,12 @@ pub struct SettingsPanel {
     data: Option<SettingsData>,
     system_sink_vol: f32,
     system_source_vol: f32,
+    system_sink_muted: bool,
+    system_source_muted: bool,
     sink_input_volumes: HashMap<u32, f32>,
     source_output_volumes: HashMap<u32, f32>,
+    pub theme_name: String,
+    available_themes: Vec<String>,
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
@@ -39,6 +43,13 @@ pub enum Msg {
     SourceOutputVolumeReleased(u32, f32),
     SinkInputDeviceSelected(u32, AudioDevice),
     SourceOutputDeviceSelected(u32, AudioDevice),
+    // Mute toggles
+    SystemSinkMuteToggled,
+    SystemSourceMuteToggled,
+    SinkInputMuteToggled(u32),
+    SourceOutputMuteToggled(u32),
+    // Theme selection
+    ThemeChanged(String),
 }
 
 // ── Impl ──────────────────────────────────────────────────────────────────────
@@ -49,8 +60,12 @@ impl SettingsPanel {
             data: None,
             system_sink_vol: 0.5,
             system_source_vol: 0.5,
+            system_sink_muted: false,
+            system_source_muted: false,
             sink_input_volumes: HashMap::new(),
             source_output_volumes: HashMap::new(),
+            theme_name: theme::current_theme_name().unwrap_or_else(|| "default".to_owned()),
+            available_themes: theme::list_themes(),
         }
     }
 
@@ -58,6 +73,12 @@ impl SettingsPanel {
         self.data = None;
         self.sink_input_volumes.clear();
         self.source_output_volumes.clear();
+        // theme_name / available_themes survive close/reopen
+    }
+
+    /// Called by app/mod.rs after it applies a theme change.
+    pub fn set_theme_name(&mut self, name: String) {
+        self.theme_name = name;
     }
 
     pub fn update(&mut self, msg: Msg) -> Task<Msg> {
@@ -65,6 +86,8 @@ impl SettingsPanel {
             Msg::Loaded(data) => {
                 self.system_sink_vol = data.default_sink_vol;
                 self.system_source_vol = data.default_source_vol;
+                self.system_sink_muted = data.default_sink_muted;
+                self.system_source_muted = data.default_source_muted;
                 self.data = Some(data);
             }
 
@@ -216,6 +239,34 @@ impl SettingsPanel {
                     tokio::spawn(audio::move_source_output(stream_id, device.id));
                 }
             }
+
+            Msg::SystemSinkMuteToggled => {
+                self.system_sink_muted = !self.system_sink_muted;
+                tokio::spawn(audio::toggle_sink_mute());
+            }
+            Msg::SystemSourceMuteToggled => {
+                self.system_source_muted = !self.system_source_muted;
+                tokio::spawn(audio::toggle_source_mute());
+            }
+            Msg::SinkInputMuteToggled(id) => {
+                if let Some(data) = &mut self.data {
+                    if let Some(input) = data.sink_inputs.iter_mut().find(|i| i.id == id) {
+                        input.muted = !input.muted;
+                    }
+                }
+                tokio::spawn(audio::toggle_sink_input_mute(id));
+            }
+            Msg::SourceOutputMuteToggled(id) => {
+                if let Some(data) = &mut self.data {
+                    if let Some(output) = data.source_outputs.iter_mut().find(|o| o.id == id) {
+                        output.muted = !output.muted;
+                    }
+                }
+                tokio::spawn(audio::toggle_source_output_mute(id));
+            }
+
+            // Intercepted by app/mod.rs; state.theme and theme_name are updated there.
+            Msg::ThemeChanged(_) => {}
         }
         Task::none()
     }
@@ -251,11 +302,14 @@ impl SettingsPanel {
         ]
         .align_y(Alignment::Center);
 
-        let slider_style = move |_t: &iced::Theme, _s: iced::widget::slider::Status| {
-            iced::widget::slider::Style {
+        // Returns a slider style fn; when muted both rails and handle use the inactive colour.
+        let make_slider_style = move |is_muted: bool| {
+            let rail_left = if is_muted { slider_inactive } else { accent };
+            let knob = if is_muted { slider_inactive } else { handle_color };
+            move |_t: &iced::Theme, _s: iced::widget::slider::Status| iced::widget::slider::Style {
                 rail: iced::widget::slider::Rail {
                     backgrounds: (
-                        Background::Color(accent),
+                        Background::Color(rail_left),
                         Background::Color(slider_inactive),
                     ),
                     width: 4.0,
@@ -263,12 +317,16 @@ impl SettingsPanel {
                 },
                 handle: iced::widget::slider::Handle {
                     shape: iced::widget::slider::HandleShape::Circle { radius: 7.0 },
-                    background: Background::Color(handle_color),
+                    background: Background::Color(knob),
                     border_color: Color::TRANSPARENT,
                     border_width: 0.0,
                 },
             }
         };
+
+        // Ghost button style for mute icons.
+        let mute_icon_style =
+            move |_: &iced::Theme, _: button::Status| button::Style { ..Default::default() };
 
         // Segmented pill: [System][Custom] with half-rounded corners on each side.
         let pill_toggle = |is_system: bool,
@@ -338,18 +396,23 @@ impl SettingsPanel {
                 let selected_source =
                     data.sources.iter().find(|s| s.id == data.default_source_id).cloned();
 
-                // label | icon | slider | pct | dropdown
+                // label | mute-icon-btn | slider | pct | dropdown
+                let sink_dim = if self.system_sink_muted { muted_dim } else { text_color };
+                let sink_icon = if self.system_sink_muted { "🔇" } else { "🔊" };
                 let system_out = row![
-                    text("Output").size(13).color(text_color).width(70),
-                    text("🔊").size(14),
+                    text("Output").size(13).color(sink_dim).width(70),
+                    button(text(sink_icon).size(14).color(sink_dim))
+                        .on_press(Msg::SystemSinkMuteToggled)
+                        .padding(0)
+                        .style(mute_icon_style),
                     iced::widget::slider(0.0..=1.5, self.system_sink_vol, Msg::SystemSinkChanged)
                         .on_release(Msg::SystemSinkReleased(self.system_sink_vol))
                         .step(0.01)
-                        .style(slider_style)
+                        .style(make_slider_style(self.system_sink_muted))
                         .width(Length::Fill),
                     text(format!("{:.0}%", self.system_sink_vol * 100.0))
                         .size(12)
-                        .color(subdued)
+                        .color(if self.system_sink_muted { muted_dim } else { subdued })
                         .width(44),
                     pick_list(data.sinks.clone(), selected_sink, Msg::DefaultSinkSelected)
                         .width(185),
@@ -357,9 +420,14 @@ impl SettingsPanel {
                 .spacing(10)
                 .align_y(Alignment::Center);
 
+                let src_dim = if self.system_source_muted { muted_dim } else { text_color };
+                let src_icon = if self.system_source_muted { "🔇" } else { "🎙" };
                 let system_in = row![
-                    text("Input").size(13).color(text_color).width(70),
-                    text("🎙").size(14),
+                    text("Input").size(13).color(src_dim).width(70),
+                    button(text(src_icon).size(14).color(src_dim))
+                        .on_press(Msg::SystemSourceMuteToggled)
+                        .padding(0)
+                        .style(mute_icon_style),
                     iced::widget::slider(
                         0.0..=1.5,
                         self.system_source_vol,
@@ -367,11 +435,11 @@ impl SettingsPanel {
                     )
                     .on_release(Msg::SystemSourceReleased(self.system_source_vol))
                     .step(0.01)
-                    .style(slider_style)
+                    .style(make_slider_style(self.system_source_muted))
                     .width(Length::Fill),
                     text(format!("{:.0}%", self.system_source_vol * 100.0))
                         .size(12)
-                        .color(subdued)
+                        .color(if self.system_source_muted { muted_dim } else { subdued })
                         .width(44),
                     pick_list(data.sources.clone(), selected_source, Msg::DefaultSourceSelected)
                         .width(185),
@@ -414,20 +482,24 @@ impl SettingsPanel {
                             input.app_name.clone()
                         };
 
+                        let app_sl = make_slider_style(muted);
                         let app_row: Element<'_, Msg> = if si_system {
                             row![
                                 text(label).size(13).color(label_color).width(90),
-                                text(icon).size(14).color(label_color),
+                                button(text(icon).size(14).color(label_color))
+                                    .on_press(Msg::SinkInputMuteToggled(id))
+                                    .padding(0)
+                                    .style(mute_icon_style),
                                 iced::widget::slider(0.0..=1.5, vol, move |v| {
                                     Msg::SinkInputVolumeChanged(id, v)
                                 })
                                 .on_release(Msg::SinkInputVolumeReleased(id, vol))
                                 .step(0.01)
-                                .style(slider_style)
+                                .style(app_sl)
                                 .width(Length::Fill),
                                 text(format!("{:.0}%", vol * 100.0))
                                     .size(12)
-                                    .color(subdued)
+                                    .color(if muted { muted_dim } else { subdued })
                                     .width(44),
                             ]
                             .spacing(10)
@@ -438,17 +510,20 @@ impl SettingsPanel {
                                 data.sinks.iter().find(|s| s.id == input.device_id).cloned();
                             row![
                                 text(label).size(13).color(label_color).width(90),
-                                text(icon).size(14).color(label_color),
+                                button(text(icon).size(14).color(label_color))
+                                    .on_press(Msg::SinkInputMuteToggled(id))
+                                    .padding(0)
+                                    .style(mute_icon_style),
                                 iced::widget::slider(0.0..=1.5, vol, move |v| {
                                     Msg::SinkInputVolumeChanged(id, v)
                                 })
                                 .on_release(Msg::SinkInputVolumeReleased(id, vol))
                                 .step(0.01)
-                                .style(slider_style)
+                                .style(app_sl)
                                 .width(Length::Fill),
                                 text(format!("{:.0}%", vol * 100.0))
                                     .size(12)
-                                    .color(subdued)
+                                    .color(if muted { muted_dim } else { subdued })
                                     .width(44),
                                 pick_list(
                                     data.sinks.clone(),
@@ -490,20 +565,24 @@ impl SettingsPanel {
                             output.app_name.clone()
                         };
 
+                        let app_sl = make_slider_style(muted);
                         let app_row: Element<'_, Msg> = if so_system {
                             row![
                                 text(label).size(13).color(label_color).width(90),
-                                text(icon).size(14).color(label_color),
+                                button(text(icon).size(14).color(label_color))
+                                    .on_press(Msg::SourceOutputMuteToggled(id))
+                                    .padding(0)
+                                    .style(mute_icon_style),
                                 iced::widget::slider(0.0..=1.5, vol, move |v| {
                                     Msg::SourceOutputVolumeChanged(id, v)
                                 })
                                 .on_release(Msg::SourceOutputVolumeReleased(id, vol))
                                 .step(0.01)
-                                .style(slider_style)
+                                .style(app_sl)
                                 .width(Length::Fill),
                                 text(format!("{:.0}%", vol * 100.0))
                                     .size(12)
-                                    .color(subdued)
+                                    .color(if muted { muted_dim } else { subdued })
                                     .width(44),
                             ]
                             .spacing(10)
@@ -514,17 +593,20 @@ impl SettingsPanel {
                                 data.sources.iter().find(|s| s.id == output.device_id).cloned();
                             row![
                                 text(label).size(13).color(label_color).width(90),
-                                text(icon).size(14).color(label_color),
+                                button(text(icon).size(14).color(label_color))
+                                    .on_press(Msg::SourceOutputMuteToggled(id))
+                                    .padding(0)
+                                    .style(mute_icon_style),
                                 iced::widget::slider(0.0..=1.5, vol, move |v| {
                                     Msg::SourceOutputVolumeChanged(id, v)
                                 })
                                 .on_release(Msg::SourceOutputVolumeReleased(id, vol))
                                 .step(0.01)
-                                .style(slider_style)
+                                .style(app_sl)
                                 .width(Length::Fill),
                                 text(format!("{:.0}%", vol * 100.0))
                                     .size(12)
-                                    .color(subdued)
+                                    .color(if muted { muted_dim } else { subdued })
                                     .width(44),
                                 pick_list(
                                     data.sources.clone(),
@@ -550,9 +632,29 @@ impl SettingsPanel {
             }
         };
 
-        column![header, rule::horizontal(1), body]
-            .spacing(12)
-            .padding(20)
-            .into()
+        // ── Theme row ───────────────────────────────────────────────────────────
+
+        let theme_row = row![
+            text("THEME").size(11).color(subdued).width(70),
+            pick_list(
+                self.available_themes.clone(),
+                Some(self.theme_name.clone()),
+                Msg::ThemeChanged,
+            )
+            .width(185),
+        ]
+        .spacing(10)
+        .align_y(Alignment::Center);
+
+        column![
+            header,
+            rule::horizontal(1),
+            container(body).height(Length::Fill),
+            rule::horizontal(1),
+            theme_row,
+        ]
+        .spacing(12)
+        .padding(20)
+        .into()
     }
 }

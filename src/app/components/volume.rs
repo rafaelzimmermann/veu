@@ -26,6 +26,8 @@ pub enum Msg {
     SinkReleased(f32),
     SourceReleased(f32),
     MuteAllToggled,
+    SinkMuteToggled,
+    SourceMuteToggled,
     OpenSettings,
 }
 
@@ -40,8 +42,7 @@ impl VolumeControl {
             source_muted: false,
             loaded: false,
         };
-        let task = Task::perform(audio::load(), Msg::Loaded);
-        (state, task)
+        (state, Task::perform(audio::load(), Msg::Loaded))
     }
 
     pub fn update(&mut self, msg: Msg) -> Task<Msg> {
@@ -76,6 +77,16 @@ impl VolumeControl {
                 tokio::spawn(audio::toggle_mute_all());
             }
 
+            Msg::SinkMuteToggled => {
+                self.sink_muted = !self.sink_muted;
+                tokio::spawn(audio::toggle_sink_mute());
+            }
+
+            Msg::SourceMuteToggled => {
+                self.source_muted = !self.source_muted;
+                tokio::spawn(audio::toggle_source_mute());
+            }
+
             // Intercepted by app/mod.rs before reaching here.
             Msg::OpenSettings => {}
         }
@@ -83,99 +94,55 @@ impl VolumeControl {
     }
 
     pub fn view(&self, theme: &Theme) -> Element<'_, Msg> {
+        let colors = ViewColors::from_theme(theme);
         let all_muted = self.sink_muted && self.source_muted;
-        let text_color = theme.text;
-        let accent = theme.accent;
-        let btn_inactive = theme.button_inactive;
-        let slider_inactive = theme.slider_inactive;
-        let handle_color = theme.handle;
-        let subdued = Color { a: (text_color.a * 0.55).max(0.4), ..text_color };
-
-        // Mute button and gear share the same pill style; group them in the header.
-        let btn_style = move |active: bool| {
-            move |_: &iced::Theme, _: button::Status| button::Style {
-                background: Some(Background::Color(if active { accent } else { btn_inactive })),
-                text_color,
-                border: Border { radius: 6.0.into(), ..Default::default() },
-                ..Default::default()
-            }
-        };
-
-        let mute_btn = button(
-            text(if all_muted { "Unmute" } else { "Mute All" }).size(12).color(text_color),
-        )
-        .on_press(Msg::MuteAllToggled)
-        .padding([3, 9])
-        .style(btn_style(all_muted));
-
-        let gear_btn = button(text("⚙").size(13).color(text_color))
-            .on_press(Msg::OpenSettings)
-            .padding([3, 7])
-            .style(btn_style(false));
 
         let header = row![
-            text("Sound Control").size(14).color(text_color),
+            text("Sound Control").size(14).color(colors.text),
             space::horizontal(),
-            mute_btn,
-            gear_btn,
+            button(
+                text(if all_muted { "Unmute" } else { "Mute All" })
+                    .size(12)
+                    .color(colors.text),
+            )
+            .on_press(Msg::MuteAllToggled)
+            .padding([3, 9])
+            .style(colors.pill_btn_style(all_muted)),
+            button(text("⚙").size(13).color(colors.text))
+                .on_press(Msg::OpenSettings)
+                .padding([3, 7])
+                .style(colors.pill_btn_style(false)),
         ]
         .spacing(6)
         .align_y(Alignment::Center);
 
-        let slider_style = move |_t: &iced::Theme, _s: slider::Status| slider::Style {
-            rail: slider::Rail {
-                backgrounds: (
-                    Background::Color(accent),
-                    Background::Color(slider_inactive),
-                ),
-                width: 4.0,
-                border: Border::default(),
-            },
-            handle: slider::Handle {
-                shape: slider::HandleShape::Circle { radius: 8.0 },
-                background: Background::Color(handle_color),
-                border_color: Color::TRANSPARENT,
-                border_width: 0.0,
-            },
-        };
-
         let body: Element<'_, Msg> = if !self.loaded {
-            text("Loading…").color(text_color).into()
+            text("Loading…").color(colors.text).into()
         } else {
-            // label | icon | slider | pct
-            let source_row = row![
-                text("Input").size(13).color(text_color).width(52),
-                text("🎙").size(13),
-                slider(0.0..=1.5, self.source_volume, Msg::SourceChanged)
-                    .on_release(Msg::SourceReleased(self.source_volume))
-                    .step(0.01)
-                    .style(slider_style)
-                    .width(Length::Fill),
-                text(format!("{:.0}%", self.source_volume * 100.0))
-                    .size(12)
-                    .color(subdued)
-                    .width(40),
+            column![
+                channel_row(
+                    "Input",
+                    "🎙",
+                    self.source_volume,
+                    self.source_muted,
+                    Msg::SourceChanged,
+                    Msg::SourceReleased(self.source_volume),
+                    Msg::SourceMuteToggled,
+                    &colors,
+                ),
+                channel_row(
+                    "Output",
+                    "🔊",
+                    self.sink_volume,
+                    self.sink_muted,
+                    Msg::SinkChanged,
+                    Msg::SinkReleased(self.sink_volume),
+                    Msg::SinkMuteToggled,
+                    &colors,
+                ),
             ]
-            .spacing(8)
-            .align_y(Alignment::Center);
-
-            let sink_row = row![
-                text("Output").size(13).color(text_color).width(52),
-                text("🔊").size(13),
-                slider(0.0..=1.5, self.sink_volume, Msg::SinkChanged)
-                    .on_release(Msg::SinkReleased(self.sink_volume))
-                    .step(0.01)
-                    .style(slider_style)
-                    .width(Length::Fill),
-                text(format!("{:.0}%", self.sink_volume * 100.0))
-                    .size(12)
-                    .color(subdued)
-                    .width(40),
-            ]
-            .spacing(8)
-            .align_y(Alignment::Center);
-
-            column![source_row, sink_row].spacing(14).into()
+            .spacing(14)
+            .into()
         };
 
         column![header, rule::horizontal(1), body]
@@ -183,4 +150,108 @@ impl VolumeControl {
             .padding(16)
             .into()
     }
+}
+
+// ── View helpers ──────────────────────────────────────────────────────────────
+
+/// Colours derived from a [`Theme`], shared across all view helpers.
+struct ViewColors {
+    text: Color,
+    accent: Color,
+    btn_inactive: Color,
+    slider_inactive: Color,
+    handle: Color,
+    subdued: Color,
+    muted_dim: Color,
+}
+
+impl ViewColors {
+    fn from_theme(theme: &Theme) -> Self {
+        let text = theme.text;
+        Self {
+            text,
+            accent: theme.accent,
+            btn_inactive: theme.button_inactive,
+            slider_inactive: theme.slider_inactive,
+            handle: theme.handle,
+            subdued: Color { a: (text.a * 0.55).max(0.4), ..text },
+            muted_dim: Color { a: (text.a * 0.35).max(0.25), ..text },
+        }
+    }
+
+    /// Rounded pill button (used for Mute All and gear).
+    fn pill_btn_style(
+        &self,
+        active: bool,
+    ) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
+        let bg = if active { self.accent } else { self.btn_inactive };
+        let text_color = self.text;
+        move |_, _| button::Style {
+            background: Some(Background::Color(bg)),
+            text_color,
+            border: Border { radius: 6.0.into(), ..Default::default() },
+            ..Default::default()
+        }
+    }
+
+    /// Slider style — both rails and handle grey when `muted`.
+    fn slider_style(
+        &self,
+        muted: bool,
+    ) -> impl Fn(&iced::Theme, slider::Status) -> slider::Style {
+        let rail_left = if muted { self.slider_inactive } else { self.accent };
+        let knob = if muted { self.slider_inactive } else { self.handle };
+        let rail_right = self.slider_inactive;
+        move |_, _| slider::Style {
+            rail: slider::Rail {
+                backgrounds: (Background::Color(rail_left), Background::Color(rail_right)),
+                width: 4.0,
+                border: Border::default(),
+            },
+            handle: slider::Handle {
+                shape: slider::HandleShape::Circle { radius: 8.0 },
+                background: Background::Color(knob),
+                border_color: Color::TRANSPARENT,
+                border_width: 0.0,
+            },
+        }
+    }
+}
+
+/// One labelled channel row: `label | icon-btn | slider | pct`.
+///
+/// The icon acts as the mute toggle; the row dims when `muted`.
+fn channel_row<'a>(
+    label: &'a str,
+    unmuted_icon: &'a str,
+    volume: f32,
+    muted: bool,
+    on_change: fn(f32) -> Msg,
+    on_release: Msg,
+    on_mute: Msg,
+    colors: &ViewColors,
+) -> Element<'a, Msg> {
+    let dim = if muted { colors.muted_dim } else { colors.text };
+    let pct_color = if muted { colors.muted_dim } else { colors.subdued };
+    let icon = if muted { "🔇" } else { unmuted_icon };
+
+    row![
+        text(label).size(13).color(dim).width(52),
+        button(text(icon).size(13).color(dim))
+            .on_press(on_mute)
+            .padding(0)
+            .style(|_, _| button::Style { ..Default::default() }),
+        slider(0.0..=1.5, volume, on_change)
+            .on_release(on_release)
+            .step(0.01)
+            .style(colors.slider_style(muted))
+            .width(Length::Fill),
+        text(format!("{:.0}%", volume * 100.0))
+            .size(12)
+            .color(pct_color)
+            .width(40),
+    ]
+    .spacing(8)
+    .align_y(Alignment::Center)
+    .into()
 }

@@ -14,7 +14,7 @@ mod components;
 use components::settings::{self, SettingsPanel};
 use components::volume::{self, VolumeControl};
 use crate::audio;
-use crate::theme::{Placement, Theme};
+use crate::theme::{self, Placement, Theme};
 
 // ── AppMode ───────────────────────────────────────────────────────────────────
 
@@ -102,6 +102,11 @@ pub fn update(state: &mut Veu, msg: Message) -> Task<Message> {
         Message::Settings(m) => match m {
             settings::Msg::Close => {
                 state.mode = AppMode::Tray;
+            }
+            settings::Msg::ThemeChanged(name) => {
+                theme::persist_theme(&name);
+                state.theme = Theme::load();
+                state.settings.set_theme_name(name);
             }
             m => return state.settings.update(m).map(Message::Settings),
         },

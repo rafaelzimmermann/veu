@@ -142,6 +142,41 @@ impl Theme {
     }
 }
 
+/// Return sorted names of all `.conf` files in `~/.config/veu/themes/`.
+pub fn list_themes() -> Vec<String> {
+    let Some(dir) = config_path("themes") else { return Vec::new() };
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            let path = e.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("conf") {
+                path.file_stem().and_then(|s| s.to_str()).map(str::to_owned)
+            } else {
+                None
+            }
+        })
+        .collect();
+    names.sort();
+    names
+}
+
+/// Write `name` to `~/.config/veu/current-theme`.
+pub fn persist_theme(name: &str) {
+    if let Some(path) = config_path("current-theme") {
+        let _ = std::fs::write(path, name);
+    }
+}
+
+/// Read the currently active theme name from `~/.config/veu/current-theme`.
+pub fn current_theme_name() -> Option<String> {
+    config_path("current-theme")
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty())
+}
+
 fn config_path(rel: &str) -> Option<std::path::PathBuf> {
     std::env::var("HOME")
         .ok()

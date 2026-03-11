@@ -66,6 +66,8 @@ pub struct SettingsData {
     pub default_source_id: u32,
     pub default_sink_vol: f32,
     pub default_source_vol: f32,
+    pub default_sink_muted: bool,
+    pub default_source_muted: bool,
     pub sink_inputs: Vec<AppStream>,
     pub source_outputs: Vec<AppStream>,
     pub sink_input_mode: StreamMode,
@@ -128,8 +130,8 @@ pub async fn load_settings() -> SettingsData {
     let (sources, mut default_source_id) = parse_sources(&sources_out);
     let mut sink_inputs = parse_sink_inputs(&inputs_out);
     let mut source_outputs = parse_source_outputs(&outputs_out);
-    let (default_sink_vol, _) = parse_volume(&sink_vol_out);
-    let (default_source_vol, _) = parse_volume(&source_vol_out);
+    let (default_sink_vol, default_sink_muted) = parse_volume(&sink_vol_out);
+    let (default_source_vol, default_source_muted) = parse_volume(&source_vol_out);
 
     // Apply stored device preferences (system defaults + per-app routing).
     let prefs = load_device_prefs();
@@ -208,6 +210,8 @@ pub async fn load_settings() -> SettingsData {
         default_source_id,
         default_sink_vol,
         default_source_vol,
+        default_sink_muted,
+        default_source_muted,
         sink_inputs,
         source_outputs,
         sink_input_mode,
@@ -267,6 +271,22 @@ pub async fn apply_routing_preferences() {
             }
         }
     }
+}
+
+pub async fn toggle_sink_mute() {
+    wpctl(&["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]).await;
+}
+
+pub async fn toggle_source_mute() {
+    wpctl(&["set-mute", "@DEFAULT_AUDIO_SOURCE@", "toggle"]).await;
+}
+
+pub async fn toggle_sink_input_mute(id: u32) {
+    pactl_cmd(&["set-sink-input-mute", &id.to_string(), "toggle"]).await;
+}
+
+pub async fn toggle_source_output_mute(id: u32) {
+    pactl_cmd(&["set-source-output-mute", &id.to_string(), "toggle"]).await;
 }
 
 pub async fn set_sink_input_volume(id: u32, vol: f32) {

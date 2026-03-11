@@ -10,13 +10,15 @@ All notable changes to this project will be documented in this file.
 - **Per-application volume and routing** — Applications — Output and Applications — Input sections list all active PipeWire sink-inputs and source-outputs with individual sliders (0–150%) and device pick-lists. Device assignments are stored per app name and restored automatically when settings open.
 - **System / Custom routing mode** — each applications section has a segmented pill toggle. *System* mode immediately routes all streams to the current default device and re-applies this at every app startup; *Custom* mode re-enables per-app stored preferences. Mode preference is persisted in `device-prefs.conf`.
 - **Startup routing** — `apply_routing_preferences()` runs at boot (before the tray appears) to enforce whichever routing mode was last saved, with no settings panel interaction required.
-- **Mute state in settings** — muted per-app streams are visually dimmed and display 🔇 instead of 🔊 / 🎙.
+- **Per-channel mute** — Output and Input each have an individual mute button (the speaker/mic icon). Clicking it toggles that channel via `pactl`/`wpctl`; the icon switches to 🔇 and the entire row dims. Applies in both the tray popup and the settings panel for system and per-app streams.
+- **Theme selection in settings** — a THEME pick-list at the bottom of the settings panel lists all installed named themes. Selecting one applies it immediately and persists the choice to `~/.config/veu/current-theme`.
 - **Volume percentage readout** — all sliders (tray and settings) display the current value as a `%` label to the right of the handle.
 
 ### Changed
 - **Tray popup** — gear button moved into the header row alongside Mute All (footer row removed); height reduced from 200 → 180 px; "Mute All" label becomes "Unmute" when active.
 - **Settings layout** — section headers (`SYSTEM`, `APPLICATIONS — OUTPUT/INPUT`) rendered in subdued uppercase at 11 px; all rows share aligned fixed-width columns (label · icon · slider · % · dropdown); padding increased to 20 px; spacing tightened throughout.
 - **`device-prefs.conf`** — file extended with reserved keys: `__default_sink__`, `__default_source__`, `__sink_input_mode__`, `__source_output_mode__`.
+- **`volume.rs` refactor** — view logic split into a `ViewColors` struct (centralises derived colours and button/slider style factories) and a `channel_row()` free function (renders one labelled slider row); eliminates duplication between the Output and Input rows.
 
 ### Removed
 - Unused `Placement::anchor()`, `Placement::margin()`, and `Theme::from_file()` methods and their associated tests.
