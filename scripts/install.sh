@@ -45,14 +45,17 @@ done
 
 if $SYSTEM; then
     BIN_DIR="/usr/local/bin"
-    DESKTOP_DIR="/usr/local/share/applications"
+    DESKTOP_DIR="/usr/share/applications"
+    ICON_DIR="/usr/share/icons/hicolor/48x48/apps"
 else
     BIN_DIR="${HOME}/.local/bin"
     DESKTOP_DIR="${HOME}/.local/share/applications"
+    ICON_DIR="${HOME}/.local/share/icons/hicolor/48x48/apps"
 fi
 
 BINARY="$BIN_DIR/veu"
 DESKTOP_FILE="$DESKTOP_DIR/veu.desktop"
+ICON_FILE="$ICON_DIR/veu.png"
 CONFIG_DIR="${HOME}/.config/veu"
 THEME_FILE="$CONFIG_DIR/theme.conf"
 THEMES_DIR="$CONFIG_DIR/themes"
@@ -88,8 +91,9 @@ confirm() {
 
 if $UNINSTALL; then
     echo "Uninstalling veu…"
-    priv_rm -f  "$BINARY"
-    priv_rm -f  "$DESKTOP_FILE"
+    priv_rm -f "$BINARY"
+    priv_rm -f "$DESKTOP_FILE"
+    priv_rm -f "$ICON_FILE"
     rm -rf "$CONFIG_DIR"
     echo "Done."
     exit 0
@@ -163,6 +167,17 @@ else
     echo "Keeping existing themes."
 fi
 
+# ── Clean up stale files from old install locations ───────────────────────────
+
+priv_rm -f "/usr/local/share/applications/veu.desktop"
+priv_rm -f "/usr/local/share/icons/hicolor/512x512/apps/veu.png"
+
+# ── Icon ──────────────────────────────────────────────────────────────────────
+
+echo "Installing icon…"
+priv_mkdir "$ICON_DIR"
+priv_install -m 644 assets/icon.png "$ICON_FILE"
+
 # ── Desktop entry ─────────────────────────────────────────────────────────────
 
 priv_mkdir "$DESKTOP_DIR"
@@ -172,8 +187,8 @@ Type=Application
 Name=veu
 Comment=Wayland PipeWire volume popup
 Exec=veu
-Categories=Utility;
-NoDisplay=true
+Icon=veu
+Categories=AudioVideo;Audio;Utility;
 EOF
 
 # ── Summary ───────────────────────────────────────────────────────────────────
@@ -181,6 +196,7 @@ EOF
 echo ""
 echo "Installed:  $BINARY"
 echo "Desktop:    $DESKTOP_FILE"
+echo "Icon:       $ICON_FILE"
 echo "Theme:      $THEME_FILE"
 echo "Themes:     $THEMES_DIR"
 echo ""

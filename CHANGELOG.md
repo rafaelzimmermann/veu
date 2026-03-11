@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 - **Volume feedback sound** — a short system sound plays after releasing the output slider so the user can judge whether the new level is adequate. Uses `paplay` with the freedesktop sound theme (`audio-volume-change.oga`); silently no-ops if `paplay` or the sound file is not available. The sound is applied after `wpctl set-volume` completes so it plays at the new level.
 - **Configurable placement** — `placement` and `margin` are now first-class theme fields. The popup can be anchored to any corner or edge (`top-right`, `top-left`, `top-center`, `bottom-right`, `bottom-left`, `bottom-center`, `center`). Both keys live in `theme.conf` alongside colours; named colour-only themes inherit the user's placement/margin unchanged.
 - **Click-outside-to-close** — the layer-shell surface now covers the full monitor (transparent background). Clicks inside the popup box are absorbed; clicks anywhere outside it close the popup. This matches the compositor interaction model used by trebuchet.
+- **App icon** (`assets/icon.png`) — transparent-background PNG installed to the hicolor icon theme so launchers display it.
+- **Launcher visibility** — desktop entry now installs to `/usr/share/applications` (system) or `~/.local/share/applications` (user) with `Icon=veu` and `Categories=AudioVideo;Audio;Utility;`, making veu visible in app launchers. Old misplaced files from prior installs are cleaned up automatically.
 
 ### Removed
 - `veu.conf` (separate placement config) — placement and margin have moved into `theme.conf`; the `config` module has been eliminated.
