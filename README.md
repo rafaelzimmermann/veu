@@ -4,7 +4,8 @@ Wayland layer-shell popup for quickly controlling PipeWire audio volume.
 
 Built with [iced](https://github.com/iced-rs/iced) and [iced-layershell](https://github.com/waycrate/exwlshelleventloop).
 
-![screenshot placeholder]
+<img width="200" height="200" alt="icon_no_bg" src="https://github.com/user-attachments/assets/2f774ae7-121c-46e1-acfa-a1c40fae2eec" />
+
 
 ## Features
 
